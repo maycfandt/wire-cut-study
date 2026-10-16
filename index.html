@@ -1,0 +1,836 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Wire Cut Study</title>
+<meta name="description" content="A drawing made only by cutting. Drag a wire across the plate and the pieces come loose.">
+<meta name="theme-color" content="#d4d9dc" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#171b1e" media="(prefers-color-scheme: dark)">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Wire Cut Study">
+<meta property="og:description" content="A drawing made only by cutting. Drag a wire across the plate and the pieces come loose.">
+<meta property="og:url" content="https://cut.cmcheung.co.uk/">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=&apos;http://www.w3.org/2000/svg&apos; viewBox=&apos;0 0 32 32&apos;%3E%3Crect width=&apos;32&apos; height=&apos;32&apos; fill=&apos;%23171b1e&apos;/%3E%3Cpath d=&apos;M4 22 L28 10&apos; stroke=&apos;%23e8c37a&apos; stroke-width=&apos;2&apos;/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..125,300..600&family=DM+Mono:wght@300;400&display=swap">
+<style>
+  /* Layout: the plate is the whole viewport. One small pill at the foot opens everything; at rest the chrome fades away. */
+  :root {
+    --ground: #d4d9dc;
+    --form: #191d20;
+    --wire: #8a6a2f;
+    --hud: rgba(10, 12, 14, 0.92);
+    --hud-dim: rgba(10, 12, 14, 0.46);
+    --hud-line: rgba(10, 12, 14, 0.18);
+    --sheet: rgba(255, 255, 255, 0.52);
+    --ui: "Archivo", "Helvetica Neue", Helvetica, Arial, sans-serif;
+    --mono: "DM Mono", ui-monospace, "SF Mono", Menlo, monospace;
+    --ease: cubic-bezier(.22, .61, .36, 1);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) { --ground: #171b1e; --form: #dfe4e6; --wire: #e8c37a; color-scheme: dark; }
+  }
+  :root[data-theme="dark"] { --ground: #171b1e; --form: #dfe4e6; --wire: #e8c37a; color-scheme: dark; }
+
+  html, body { height: 100%; margin: 0; overflow: hidden; }
+  body {
+    background: var(--ground);
+    color: var(--hud);
+    font-family: var(--ui);
+    font-size: 13px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  #cv {
+    position: fixed; inset: 0; width: 100%; height: 100%;
+    display: block; touch-action: none; cursor: crosshair; z-index: 0;
+  }
+  body.hold #cv { cursor: grab; }
+  body.grabbing #cv { cursor: grabbing; }
+
+  /* Chrome recedes while you work and comes back on the next move. */
+  .chrome { transition: opacity .7s var(--ease); }
+  body.idle .chrome { opacity: 0.16; }
+  @media (prefers-reduced-motion: reduce) {
+    .chrome { transition: none; }
+    body.idle .chrome { opacity: 1; }
+  }
+
+  .mast {
+    position: fixed; z-index: 2; pointer-events: none;
+    top: calc(20px + env(safe-area-inset-top, 0px));
+    left: max(20px, env(safe-area-inset-left, 0px));
+  }
+  .eyebrow { font-size: 8.5px; font-weight: 500; letter-spacing: 0.26em; text-transform: uppercase; color: var(--hud-dim); }
+  .mast h1 {
+    font-family: var(--ui); font-weight: 500; font-stretch: 116%;
+    font-size: clamp(20px, 4.2vw, 28px); line-height: 1;
+    margin: 7px 0 0; letter-spacing: -0.022em; color: var(--hud);
+  }
+
+  .hint {
+    position: fixed; left: 0; right: 0; z-index: 1;
+    bottom: calc(92px + env(safe-area-inset-bottom, 0px));
+    text-align: center; pointer-events: none;
+    font-size: 8.5px; font-weight: 500; letter-spacing: 0.26em; text-transform: uppercase; color: var(--hud-dim);
+    transition: opacity .8s var(--ease);
+  }
+
+  .dock {
+    position: fixed; z-index: 4; left: 0; right: 0;
+    bottom: calc(22px + env(safe-area-inset-bottom, 0px));
+    display: flex; justify-content: center;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    pointer-events: none;
+  }
+  .pill {
+    pointer-events: auto;
+    font-family: var(--ui); font-size: 9.5px; font-weight: 500; letter-spacing: 0.2em; text-transform: uppercase;
+    color: var(--hud); background: var(--sheet);
+    border: 1px solid var(--hud-line); border-radius: 999px;
+    padding: 10px 20px; cursor: pointer;
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    display: inline-flex; align-items: center; gap: 10px;
+    transition: border-color .3s var(--ease);
+  }
+  .pill:hover { border-color: var(--wire); }
+  .pill .tick { width: 5px; height: 5px; border-radius: 50%; background: var(--wire); }
+
+  .scrim {
+    position: fixed; inset: 0; z-index: 3; background: transparent;
+    opacity: 0; pointer-events: none;
+  }
+  body.open .scrim { pointer-events: auto; }
+
+  .sheet {
+    position: fixed; z-index: 5; left: 0; right: 0; bottom: 0;
+    display: flex; justify-content: center;
+    pointer-events: none;
+    transform: translateY(18px); opacity: 0;
+    transition: transform .34s var(--ease), opacity .28s var(--ease);
+  }
+  body.open .sheet { transform: none; opacity: 1; pointer-events: none; }
+  body.open .sheet > div { pointer-events: auto; }
+  @media (prefers-reduced-motion: reduce) { .sheet { transition: opacity .2s linear; transform: none; } }
+
+  .sheet > div {
+    width: 100%; max-width: 440px;
+    background: var(--sheet);
+    border-top: 1px solid var(--hud-line);
+    backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+    display: flex; flex-direction: column; gap: 20px;
+    padding-top: 22px;
+    padding-bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+    padding-left: max(22px, env(safe-area-inset-left, 0px));
+    padding-right: max(22px, env(safe-area-inset-right, 0px));
+  }
+  @media (min-width: 520px) {
+    .sheet > div { border: 1px solid var(--hud-line); margin-bottom: 76px; }
+  }
+
+  .group { display: flex; flex-direction: column; gap: 10px; }
+  .glabel { font-size: 8.5px; font-weight: 500; letter-spacing: 0.26em; text-transform: uppercase; color: var(--hud-dim); }
+
+  .opts { display: flex; flex-wrap: wrap; gap: 4px 22px; align-items: baseline; }
+  .opt {
+    font-family: var(--ui); font-size: 13.5px; font-weight: 400; letter-spacing: -0.005em;
+    background: none; border: 0; padding: 2px 0; cursor: pointer;
+    color: var(--hud-dim);
+    border-bottom: 1px solid transparent;
+    transition: color .2s var(--ease), border-color .2s var(--ease);
+  }
+  .opt:hover { color: var(--hud); }
+  .opt[aria-pressed="true"] { color: var(--hud); font-weight: 500; border-bottom-color: var(--wire); }
+  .opt .key { font-family: var(--mono); font-weight: 300; font-size: 9.5px; color: var(--hud-dim); margin-left: 6px; }
+
+  .swatches { display: flex; flex-wrap: wrap; gap: 9px; }
+  .sw {
+    width: 26px; height: 26px; border-radius: 50%; padding: 0; cursor: pointer;
+    border: 1px solid var(--hud-line);
+    display: grid; place-items: center;
+    transition: transform .18s var(--ease);
+  }
+  .sw:hover { transform: scale(1.12); }
+  .sw i { display: block; width: 10px; height: 10px; border-radius: 50%; }
+  .sw[aria-pressed="true"] { box-shadow: 0 0 0 1.5px var(--wire); border-color: transparent; }
+  .sw.rnd { background: transparent; border-style: dashed; color: var(--hud); font-family: var(--mono); font-size: 12px; }
+  .sw.custom { background: conic-gradient(#e2504a, #e0b34a, #6fc05a, #4ab8c0, #4a74d6, #a455cf, #e2504a); }
+
+  .custom { display: flex; flex-direction: column; gap: 12px; padding-top: 4px; }
+  .custom[hidden] { display: none; }
+  .crow { display: grid; grid-template-columns: 52px 1fr 1fr; align-items: center; gap: 10px; }
+  .crow span { font-size: 9px; font-weight: 500; letter-spacing: 0.16em; text-transform: uppercase; color: var(--hud-dim); }
+  input[type="range"].spectrum {
+    -webkit-appearance: none; appearance: none;
+    width: 100%; height: 12px; margin: 0; padding: 0;
+    border-radius: 999px; border: 1px solid var(--hud-line);
+    background: linear-gradient(to right, #ff0000, #ffff00, #00ff00, #00ffff, #0000ff, #ff00ff, #ff0000);
+    cursor: pointer;
+  }
+  input[type="range"].spectrum::-webkit-slider-thumb {
+    -webkit-appearance: none; appearance: none;
+    width: 14px; height: 14px; border-radius: 50%;
+    background: transparent; border: 2px solid #fff;
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, .55);
+    cursor: pointer;
+  }
+  input[type="range"].spectrum::-moz-range-thumb {
+    width: 12px; height: 12px; border-radius: 50%;
+    background: transparent; border: 2px solid #fff;
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, .55);
+    cursor: pointer;
+  }
+  input[type="range"].spectrum:focus-visible { outline: 2px solid var(--wire); outline-offset: 3px; }
+
+  .foot {
+    display: flex; justify-content: space-between; align-items: center; gap: 14px;
+    border-top: 1px solid var(--hud-line); padding-top: 14px;
+  }
+  .tally { font-family: var(--mono); font-weight: 300; font-size: 10.5px; color: var(--hud-dim); font-variant-numeric: tabular-nums; }
+  .plain {
+    font-family: var(--ui); font-size: 9.5px; font-weight: 500; letter-spacing: 0.2em; text-transform: uppercase;
+    background: none; border: 0; padding: 4px 0; cursor: pointer; color: var(--hud);
+    border-bottom: 1px solid var(--hud-line);
+  }
+  .plain:hover { border-bottom-color: var(--wire); }
+  .plain .key { font-family: var(--mono); font-weight: 300; font-size: 9.5px; color: var(--hud-dim); margin-left: 7px; letter-spacing: 0; }
+  .acts { display: flex; gap: 18px; align-items: center; }
+
+  button:focus-visible { outline: 2px solid var(--wire); outline-offset: 3px; }
+</style>
+
+</head>
+<body>
+<canvas id="cv"></canvas>
+
+<div class="mast chrome">
+  <div class="eyebrow">Subdivision by cut</div>
+  <h1>Wire Cut Study</h1>
+</div>
+
+<div class="hint chrome" id="hint">Cut from bare ground, drag a piece to move it</div>
+
+<div class="scrim" id="scrim"></div>
+
+<div class="dock chrome">
+  <button type="button" class="pill" id="pill" aria-expanded="false" aria-controls="sheet">
+    <span class="tick"></span><span id="pillText">Cut &middot; Auto</span>
+  </button>
+</div>
+
+<div class="sheet" id="sheet" role="dialog" aria-label="Options">
+  <div>
+    <div class="group">
+      <div class="glabel">Colour</div>
+      <div class="swatches" id="swatches" role="group" aria-label="Colour"></div>
+      <div class="custom" id="custom" hidden>
+        <div class="crow">
+          <span>Ground</span>
+          <input type="range" class="spectrum" id="gh" min="0" max="360" step="1" value="200" aria-label="Ground hue">
+          <input type="range" class="spectrum tone" id="gl" min="4" max="96" step="1" value="12" aria-label="Ground lightness">
+        </div>
+        <div class="crow">
+          <span>Form</span>
+          <input type="range" class="spectrum" id="fh" min="0" max="360" step="1" value="35" aria-label="Form hue">
+          <input type="range" class="spectrum tone" id="fl" min="4" max="96" step="1" value="72" aria-label="Form lightness">
+        </div>
+      </div>
+    </div>
+
+    <div class="group">
+      <div class="glabel">Wire</div>
+      <div class="opts" id="tools">
+        <button type="button" class="opt" data-tool="cut" aria-pressed="true">Cut<span class="key">C</span></button>
+        <button type="button" class="opt" data-tool="hold" aria-pressed="false">Hold<span class="key">H</span></button>
+      </div>
+    </div>
+
+    <div class="group">
+      <div class="glabel">Motion</div>
+      <div class="opts" id="motions">
+        <button type="button" class="opt" data-motion="drift" aria-pressed="true">Drift<span class="key">1</span></button>
+        <button type="button" class="opt" data-motion="gravity" aria-pressed="false">Fall<span class="key">2</span></button>
+        <button type="button" class="opt" data-motion="still" aria-pressed="false">Still<span class="key">3</span></button>
+      </div>
+    </div>
+
+    <div class="foot">
+      <div class="tally" id="tally">No cuts yet</div>
+      <div class="acts">
+        <button type="button" class="plain" id="bGather">Gather<span class="key">G</span></button>
+        <button type="button" class="plain" id="bReset">New plate</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  var root = document.documentElement, body = document.body;
+  var cv = document.getElementById('cv');
+  var ctx = cv.getContext('2d');
+  var hint = document.getElementById('hint');
+  var tally = document.getElementById('tally');
+  var pill = document.getElementById('pill');
+  var pillText = document.getElementById('pillText');
+  var sheet = document.getElementById('sheet');
+  var scrim = document.getElementById('scrim');
+  var swatchBox = document.getElementById('swatches');
+
+  var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var W = 0, H = 0, dpr = 1;
+  var pieces = [], cuts = 0, gone = 0;
+  var motion = 'drift', tool = 'cut', open = false;
+  var MIN_AREA = 90, MAX_PIECES = 460;
+
+  /* ---------- colour ---------- */
+
+  var palettes = [
+    { id: 'auto', label: 'Auto' },
+    { id: 'chalk', label: 'Chalk', ground: '#f1f1ee', form: '#14110f', wire: '#8a6a2f' },
+    { id: 'brine', label: 'Brine', ground: '#0d1b1e', form: '#cfe3e0', wire: '#6fb3a8' },
+    { id: 'ember', label: 'Ember', ground: '#15110f', form: '#d6522a', wire: '#e39a4a' },
+    { id: 'wax', label: 'Wax', ground: '#e7dcbe', form: '#39301c', wire: '#8f6b22' },
+    { id: 'verdigris', label: 'Verdigris', ground: '#182c28', form: '#84bda8', wire: '#d0b56a' },
+    { id: 'stark', label: 'Stark', ground: '#ffffff', form: '#000000', wire: '#c01f1f' }
+  ];
+  var current = 'auto', randomPal = null;
+
+  function hsl2hex(h, s, l) {
+    s /= 100; l /= 100;
+    var k = function (n) { return (n + h / 30) % 12; };
+    var a = s * Math.min(l, 1 - l);
+    var f = function (n) {
+      var v = l - a * Math.max(-1, Math.min(Math.min(k(n) - 3, 9 - k(n)), 1));
+      return Math.round(255 * v).toString(16).padStart(2, '0');
+    };
+    return '#' + f(0) + f(8) + f(4);
+  }
+  function makeRandom() {
+    var r = Math.random;
+    var h = r() * 360, h2 = (h + 110 + r() * 140) % 360, dark = r() < 0.5;
+    return dark
+      ? { ground: hsl2hex(h, 14 + r() * 18, 6 + r() * 7), form: hsl2hex(h2, 28 + r() * 46, 60 + r() * 24), wire: hsl2hex((h2 + 35) % 360, 58, 68), label: 'Chance' }
+      : { ground: hsl2hex(h, 10 + r() * 18, 85 + r() * 9), form: hsl2hex(h2, 30 + r() * 48, 16 + r() * 20), wire: hsl2hex((h2 + 35) % 360, 55, 38), label: 'Chance' };
+  }
+  function lum(hex) {
+    hex = (hex || '').trim().replace('#', '');
+    if (hex.length === 3) hex = hex[0] + hex[0] + hex[1] + hex[1] + hex[2] + hex[2];
+    var n = parseInt(hex, 16);
+    if (isNaN(n)) return 0.5;
+    return 0.2126 * (n >> 16 & 255) / 255 + 0.7152 * (n >> 8 & 255) / 255 + 0.0722 * (n & 255) / 255;
+  }
+  // Saturation tapers towards the light and dark ends, so no slider position lands on a garish pair.
+  function toneHex(h, l) { return hsl2hex(h, 56 * (1 - Math.abs(l - 50) / 50 * 0.55), l); }
+  function customPal() {
+    var gh = +document.getElementById('gh').value, gl = +document.getElementById('gl').value;
+    var fh = +document.getElementById('fh').value, fl = +document.getElementById('fl').value;
+    return {
+      label: 'Custom',
+      ground: toneHex(gh, gl),
+      form: toneHex(fh, fl),
+      wire: hsl2hex((fh + 35) % 360, 58, gl > 50 ? 38 : 68)
+    };
+  }
+  function palById(id) {
+    if (id === 'random') return randomPal;
+    if (id === 'custom') return customPal();
+    for (var i = 0; i < palettes.length; i++) if (palettes[i].id === id) return palettes[i];
+    return null;
+  }
+  function applyPalette() {
+    var p = palById(current);
+    if (p && p.ground) {
+      root.style.setProperty('--ground', p.ground);
+      root.style.setProperty('--form', p.form);
+      root.style.setProperty('--wire', p.wire);
+    } else {
+      root.style.removeProperty('--ground');
+      root.style.removeProperty('--form');
+      root.style.removeProperty('--wire');
+    }
+    var light = lum(getComputedStyle(root).getPropertyValue('--ground')) > 0.45;
+    root.style.setProperty('--hud', light ? 'rgba(10,12,14,0.92)' : 'rgba(244,247,249,0.94)');
+    root.style.setProperty('--hud-dim', light ? 'rgba(10,12,14,0.46)' : 'rgba(244,247,249,0.5)');
+    root.style.setProperty('--hud-line', light ? 'rgba(10,12,14,0.18)' : 'rgba(244,247,249,0.22)');
+    root.style.setProperty('--sheet', light ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.38)');
+    for (var i = 0; i < swatchBox.children.length; i++) {
+      var el = swatchBox.children[i];
+      el.setAttribute('aria-pressed', el.dataset.id === current ? 'true' : 'false');
+    }
+    document.getElementById('custom').hidden = current !== 'custom';
+    refreshTones();
+    updatePill();
+  }
+  // The lightness strips show the hue they belong to, so they read as that colour's spectrum.
+  function refreshTones() {
+    [['gh', 'gl'], ['fh', 'fl']].forEach(function (pair) {
+      var h = +document.getElementById(pair[0]).value;
+      document.getElementById(pair[1]).style.background =
+        'linear-gradient(to right, ' + toneHex(h, 4) + ', ' + toneHex(h, 50) + ', ' + toneHex(h, 96) + ')';
+    });
+    var sw = document.querySelector('.sw.custom');
+    if (sw) {
+      var p = customPal();
+      sw.firstChild.style.background = p.form;
+    }
+  }
+  function buildSwatches() {
+    palettes.forEach(function (p) {
+      var b = document.createElement('button');
+      b.type = 'button'; b.className = 'sw'; b.dataset.id = p.id;
+      b.setAttribute('aria-label', p.label); b.title = p.label;
+      b.setAttribute('aria-pressed', 'false');
+      var dot = document.createElement('i');
+      if (p.ground) { b.style.background = p.ground; dot.style.background = p.form; }
+      else { b.style.background = 'var(--ground)'; dot.style.background = 'var(--form)'; }
+      b.appendChild(dot);
+      b.addEventListener('click', function () { current = p.id; applyPalette(); });
+      swatchBox.appendChild(b);
+    });
+    var c = document.createElement('button');
+    c.type = 'button'; c.className = 'sw custom'; c.dataset.id = 'custom';
+    c.setAttribute('aria-label', 'Custom'); c.title = 'Custom, pick from the spectrum';
+    c.setAttribute('aria-pressed', 'false');
+    c.appendChild(document.createElement('i'));
+    c.addEventListener('click', function () { current = 'custom'; applyPalette(); });
+    swatchBox.appendChild(c);
+
+    var r = document.createElement('button');
+    r.type = 'button'; r.className = 'sw rnd'; r.dataset.id = 'random';
+    r.setAttribute('aria-label', 'Chance'); r.title = 'Chance, a new pair each press';
+    r.setAttribute('aria-pressed', 'false');
+    r.textContent = '?';
+    r.addEventListener('click', randomise);
+    swatchBox.appendChild(r);
+  }
+  function randomise() { randomPal = makeRandom(); current = 'random'; applyPalette(); }
+
+  function updatePill() {
+    var p = palById(current);
+    var name = p && p.label ? p.label : 'Auto';
+    pillText.textContent = (tool === 'cut' ? 'Cut' : 'Hold') + ' · ' + name;
+  }
+
+  /* ---------- geometry ---------- */
+
+  function polyArea(p) {
+    var s = 0;
+    for (var i = 0, n = p.length; i < n; i++) { var a = p[i], b = p[(i + 1) % n]; s += a[0] * b[1] - b[0] * a[1]; }
+    return Math.abs(s) / 2;
+  }
+  function polyCentroid(p) {
+    var cx = 0, cy = 0, s = 0;
+    for (var i = 0, n = p.length; i < n; i++) {
+      var a = p[i], b = p[(i + 1) % n];
+      var f = a[0] * b[1] - b[0] * a[1];
+      s += f; cx += (a[0] + b[0]) * f; cy += (a[1] + b[1]) * f;
+    }
+    if (Math.abs(s) < 1e-9) return [p[0][0], p[0][1]];
+    s *= 3;
+    return [cx / s, cy / s];
+  }
+  function radiusOf(pts) {
+    var r = 0;
+    for (var i = 0; i < pts.length; i++) { var d = Math.hypot(pts[i][0], pts[i][1]); if (d > r) r = d; }
+    return r;
+  }
+  function makePiece(worldPts, vel, angVel, home, homeAng) {
+    var c = polyCentroid(worldPts), local = [];
+    for (var i = 0; i < worldPts.length; i++) local.push([worldPts[i][0] - c[0], worldPts[i][1] - c[1]]);
+    return {
+      pts: local, pos: c, vel: vel || [0, 0], ang: 0, angVel: angVel || 0,
+      // Where this piece sat in the uncut plate, so it can always find its way back.
+      home: home ? [home[0], home[1]] : [c[0], c[1]], homeAng: homeAng || 0,
+      drift: [(Math.random() - 0.5) * 20.4, (Math.random() - 0.5) * 20.4],
+      spin: (Math.random() - 0.5) * 0.102,
+      area: polyArea(local), rad: radiusOf(local), held: false
+    };
+  }
+  function toLocal(pc, x, y) {
+    var dx = x - pc.pos[0], dy = y - pc.pos[1];
+    var ca = Math.cos(-pc.ang), sa = Math.sin(-pc.ang);
+    return [dx * ca - dy * sa, dx * sa + dy * ca];
+  }
+  function toWorld(pc, x, y) {
+    var ca = Math.cos(pc.ang), sa = Math.sin(pc.ang);
+    return [pc.pos[0] + x * ca - y * sa, pc.pos[1] + x * sa + y * ca];
+  }
+  function clipHalf(pts, q, n, sign) {
+    var out = [];
+    for (var i = 0, len = pts.length; i < len; i++) {
+      var a = pts[i], b = pts[(i + 1) % len];
+      var da = sign * ((a[0] - q[0]) * n[0] + (a[1] - q[1]) * n[1]);
+      var db = sign * ((b[0] - q[0]) * n[0] + (b[1] - q[1]) * n[1]);
+      if (da >= 0) out.push(a);
+      if ((da > 0 && db < 0) || (da < 0 && db > 0)) {
+        var t = da / (da - db);
+        out.push([a[0] + t * (b[0] - a[0]), a[1] + t * (b[1] - a[1])]);
+      }
+    }
+    return out;
+  }
+  function segmentCrosses(pts, a, b) {
+    var dx = b[0] - a[0], dy = b[1] - a[1];
+    for (var i = 0, len = pts.length; i < len; i++) {
+      var p = pts[i], q = pts[(i + 1) % len];
+      var ex = q[0] - p[0], ey = q[1] - p[1];
+      var den = dx * ey - dy * ex;
+      if (Math.abs(den) < 1e-9) continue;
+      var t = ((p[0] - a[0]) * ey - (p[1] - a[1]) * ex) / den;
+      var u = ((p[0] - a[0]) * dy - (p[1] - a[1]) * dx) / den;
+      if (t >= 0 && t <= 1 && u >= 0 && u <= 1) return true;
+    }
+    return false;
+  }
+  function pointInPoly(p, l) {
+    var inside = false;
+    for (var i = 0, j = p.length - 1; i < p.length; j = i++) {
+      var yi = p[i][1], yj = p[j][1];
+      if ((yi > l[1]) !== (yj > l[1])) {
+        var xx = (p[j][0] - p[i][0]) * (l[1] - yi) / (yj - yi) + p[i][0];
+        if (l[0] < xx) inside = !inside;
+      }
+    }
+    return inside;
+  }
+  function pointInPiece(pc, x, y) { return pointInPoly(pc.pts, toLocal(pc, x, y)); }
+  // The wire only parts what it actually ran through: it must cross an edge, or lie inside the piece.
+  function strokeTouches(pc, la, lb) {
+    return segmentCrosses(pc.pts, la, lb) || pointInPoly(pc.pts, la) || pointInPoly(pc.pts, lb);
+  }
+
+  function slice(ax, ay, bx, by, speed) {
+    var dx = bx - ax, dy = by - ay, len = Math.hypot(dx, dy);
+    if (len < 6) return false;
+    var ex = (dx / len) * 2, ey = (dy / len) * 2;
+    var A = [ax - ex, ay - ey], B = [bx + ex, by + ey];
+    var impulse = Math.min(58, 9 + speed * 0.05);
+    var next = [], didCut = false;
+
+    for (var i = 0; i < pieces.length; i++) {
+      var pc = pieces[i];
+      if (pc.area < MIN_AREA || pieces.length + next.length > MAX_PIECES) { next.push(pc); continue; }
+      var la = toLocal(pc, A[0], A[1]), lb = toLocal(pc, B[0], B[1]);
+      if (!strokeTouches(pc, la, lb)) { next.push(pc); continue; }
+      var ldx = lb[0] - la[0], ldy = lb[1] - la[1], m = Math.hypot(ldx, ldy);
+      if (m < 1e-6) { next.push(pc); continue; }
+      var n = [-ldy / m, ldx / m];
+      var h1 = clipHalf(pc.pts, la, n, 1), h2 = clipHalf(pc.pts, la, n, -1);
+      if (h1.length < 3 || h2.length < 3) { next.push(pc); continue; }
+      if (polyArea(h1) < 12 || polyArea(h2) < 12) { next.push(pc); continue; }
+
+      var ca = Math.cos(pc.ang), sa = Math.sin(pc.ang);
+      var wn = [n[0] * ca - n[1] * sa, n[0] * sa + n[1] * ca];
+      var w1 = [], w2 = [], j;
+      for (j = 0; j < h1.length; j++) w1.push(toWorld(pc, h1[j][0], h1[j][1]));
+      for (j = 0; j < h2.length; j++) w2.push(toWorld(pc, h2[j][0], h2[j][1]));
+      // Each half inherits its home from where it sat inside the parent's home.
+      var hc1 = polyCentroid(h1), hc2 = polyCentroid(h2);
+      var hca = Math.cos(pc.homeAng), hsa = Math.sin(pc.homeAng);
+      var home1 = [pc.home[0] + hc1[0] * hca - hc1[1] * hsa, pc.home[1] + hc1[0] * hsa + hc1[1] * hca];
+      var home2 = [pc.home[0] + hc2[0] * hca - hc2[1] * hsa, pc.home[1] + hc2[0] * hsa + hc2[1] * hca];
+
+      var k = impulse;
+      var a1 = makePiece(w1, [pc.vel[0] + wn[0] * k, pc.vel[1] + wn[1] * k], pc.angVel + (Math.random() - 0.5) * 0.35, home1, pc.homeAng);
+      var a2 = makePiece(w2, [pc.vel[0] - wn[0] * k, pc.vel[1] - wn[1] * k], pc.angVel + (Math.random() - 0.5) * 0.35, home2, pc.homeAng);
+      a1.ang = pc.ang; a2.ang = pc.ang;
+      next.push(a1, a2);
+      didCut = true;
+    }
+    pieces = next;
+    if (didCut) { cuts++; updateTally(); }
+    return didCut;
+  }
+
+  function shove(x, y) {
+    for (var i = 0; i < pieces.length; i++) {
+      var pc = pieces[i];
+      var dx = pc.pos[0] - x, dy = pc.pos[1] - y, d = Math.hypot(dx, dy);
+      if (d > 200 || d < 0.01) continue;
+      var f = (1 - d / 200) * 62;
+      pc.vel[0] += (dx / d) * f;
+      pc.vel[1] += (dy / d) * f;
+      pc.angVel += (Math.random() - 0.5) * 0.3;
+    }
+  }
+
+  var gather = null;
+
+  function startGather() {
+    if (!pieces.length) return;
+    for (var i = 0; i < pieces.length; i++) {
+      var pc = pieces[i];
+      pc.held = false;
+      pc.g0 = [pc.pos[0], pc.pos[1]];
+      pc.gA = pc.ang;
+      var d = pc.homeAng - pc.ang;
+      pc.gD = ((d + Math.PI) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2) - Math.PI;
+      pc.vel[0] = 0; pc.vel[1] = 0; pc.angVel = 0;
+    }
+    held = null;
+    body.classList.remove('grabbing');
+    gather = { t: 0, dur: reduceMotion ? 0.01 : 1.15 };
+  }
+
+  function step(dt) {
+    if (gather) {
+      gather.t += dt;
+      var u = Math.min(1, gather.t / gather.dur);
+      var e = u < 0.5 ? 4 * u * u * u : 1 - Math.pow(-2 * u + 2, 3) / 2;
+      for (var g = 0; g < pieces.length; g++) {
+        var q = pieces[g];
+        q.pos[0] = q.g0[0] + (q.home[0] - q.g0[0]) * e;
+        q.pos[1] = q.g0[1] + (q.home[1] - q.g0[1]) * e;
+        q.ang = q.gA + q.gD * e;
+        q.vel[0] = 0; q.vel[1] = 0; q.angVel = 0;
+      }
+      if (u >= 1) gather = null;
+      return;
+    }
+    var still = motion === 'still';
+    var damp = still ? 0.86 : 0.97, out = [];
+    for (var i = 0; i < pieces.length; i++) {
+      var pc = pieces[i];
+      if (pc.held) { out.push(pc); continue; }
+      var tx = still ? 0 : pc.drift[0], ty = still ? 0 : pc.drift[1], ts = still ? 0 : pc.spin;
+      if (motion === 'gravity') pc.vel[1] += 240 * dt;
+      pc.pos[0] += pc.vel[0] * dt;
+      pc.pos[1] += pc.vel[1] * dt;
+      pc.ang += pc.angVel * dt;
+      var d = Math.pow(damp, dt * 60);
+      pc.vel[0] = tx + (pc.vel[0] - tx) * d;
+      pc.vel[1] = ty + (pc.vel[1] - ty) * d;
+      pc.angVel = ts + (pc.angVel - ts) * d;
+      var m = pc.rad + 6;
+      if (pc.pos[0] < -m || pc.pos[0] > W + m || pc.pos[1] < -m || pc.pos[1] > H + m) { gone++; continue; }
+      out.push(pc);
+    }
+    if (out.length !== pieces.length) { pieces = out; updateTally(); }
+  }
+
+  var wire = null;
+
+  function draw() {
+    var css = getComputedStyle(root);
+    var bg = css.getPropertyValue('--ground').trim() || '#d4d9dc';
+    var form = css.getPropertyValue('--form').trim() || '#191d20';
+    var wireCol = css.getPropertyValue('--wire').trim() || '#8a6a2f';
+
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = form;
+
+    for (var i = 0; i < pieces.length; i++) {
+      var pc = pieces[i], p = pc.pts;
+      var ca = Math.cos(pc.ang), sa = Math.sin(pc.ang);
+      ctx.beginPath();
+      for (var j = 0; j < p.length; j++) {
+        var x = pc.pos[0] + p[j][0] * ca - p[j][1] * sa;
+        var y = pc.pos[1] + p[j][0] * sa + p[j][1] * ca;
+        if (j === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      }
+      ctx.closePath();
+      ctx.fill();
+      if (pc.held) { ctx.strokeStyle = wireCol; ctx.lineWidth = 1.5; ctx.stroke(); }
+    }
+
+    if (wire) {
+      ctx.strokeStyle = wireCol; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(wire.ax, wire.ay); ctx.lineTo(wire.bx, wire.by); ctx.stroke();
+    }
+  }
+
+  var last = 0;
+  function frame(t) {
+    if (!last) last = t;
+    var dt = Math.min(0.05, (t - last) / 1000);
+    last = t;
+    step(dt);
+    draw();
+    requestAnimationFrame(frame);
+  }
+
+  function updateTally() {
+    if (!cuts) { tally.textContent = 'No cuts yet'; return; }
+    var p = pieces.length === 1 ? '1 piece' : pieces.length + ' pieces';
+    tally.textContent = cuts + (cuts === 1 ? ' cut' : ' cuts') + ' · ' + p + ' · ' + gone + ' adrift';
+  }
+
+  function reset() {
+    var s = Math.min(W, H) * 0.54;
+    var x = (W - s) / 2, y = (H - s) / 2;
+    pieces = [makePiece([[x, y], [x + s, y], [x + s, y + s], [x, y + s]], [0, 0], 0)];
+    cuts = 0; gone = 0;
+    hint.style.opacity = '1';
+    updateTally();
+  }
+
+  function resize() {
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    W = window.innerWidth; H = window.innerHeight;
+    cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+  }
+
+  /* ---------- chrome ---------- */
+
+  var idleTimer = null;
+  function wake() {
+    body.classList.remove('idle');
+    clearTimeout(idleTimer);
+    if (!open) idleTimer = setTimeout(function () { body.classList.add('idle'); }, 2600);
+  }
+  function setOpen(v) {
+    open = v;
+    body.classList.toggle('open', v);
+    pill.setAttribute('aria-expanded', v ? 'true' : 'false');
+    sheet.setAttribute('aria-hidden', v ? 'false' : 'true');
+    wake();
+  }
+  pill.addEventListener('click', function () { setOpen(!open); });
+  scrim.addEventListener('click', function () { setOpen(false); });
+
+  function setTool(t) {
+    tool = t;
+    var el = document.querySelectorAll('[data-tool]');
+    for (var i = 0; i < el.length; i++) el[i].setAttribute('aria-pressed', el[i].dataset.tool === t ? 'true' : 'false');
+    body.classList.toggle('hold', t === 'hold');
+    hint.textContent = t === 'hold' ? 'Drag a piece to move it' : 'Cut from bare ground, drag a piece to move it';
+    hint.style.opacity = '1';
+    updatePill();
+  }
+  function setMotion(m) {
+    motion = m;
+    var el = document.querySelectorAll('[data-motion]');
+    for (var i = 0; i < el.length; i++) el[i].setAttribute('aria-pressed', el[i].dataset.motion === m ? 'true' : 'false');
+  }
+  document.getElementById('tools').addEventListener('click', function (e) {
+    var b = e.target.closest('[data-tool]');
+    if (b) setTool(b.dataset.tool);
+  });
+  document.getElementById('motions').addEventListener('click', function (e) {
+    var b = e.target.closest('[data-motion]');
+    if (b) setMotion(b.dataset.motion);
+  });
+  ['gh', 'gl', 'fh', 'fl'].forEach(function (id) {
+    document.getElementById(id).addEventListener('input', function () {
+      current = 'custom';
+      applyPalette();
+    });
+  });
+  document.getElementById('bGather').addEventListener('click', function () { startGather(); setOpen(false); });
+  document.getElementById('bReset').addEventListener('click', function () { reset(); setOpen(false); });
+
+  window.addEventListener('keydown', function (e) {
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    var k = e.key.toLowerCase();
+    if (k === 'escape') { setOpen(false); return; }
+    if (k === 'c') setTool('cut');
+    else if (k === 'h') setTool('hold');
+    else if (k === '1') setMotion('drift');
+    else if (k === '2') setMotion('gravity');
+    else if (k === '3') setMotion('still');
+    else if (k === 'x') randomise();
+    else if (k === 'g') startGather();
+    else if (k === 'n') reset();
+    else return;
+    wake();
+  });
+
+  /* ---------- input ---------- */
+
+  var down = null, held = null;
+  function local(e) { return [e.clientX, e.clientY]; }
+
+  function pieceAt(x, y) {
+    for (var i = pieces.length - 1; i >= 0; i--) if (pointInPiece(pieces[i], x, y)) return pieces[i];
+    return null;
+  }
+  function grab(pc, p) {
+    held = { pc: pc, ox: pc.pos[0] - p[0], oy: pc.pos[1] - p[1], vx: 0, vy: 0, t: performance.now() };
+    pc.held = true;
+    pc.vel[0] = 0; pc.vel[1] = 0; pc.angVel = 0;
+    body.classList.add('grabbing');
+  }
+
+  cv.addEventListener('pointerdown', function (e) {
+    var p = local(e);
+    hint.style.opacity = '0';
+    cv.setPointerCapture(e.pointerId);
+    wake();
+    // Press a piece and you carry it, in either mode. The wire only starts on bare ground.
+    var hit = pieceAt(p[0], p[1]);
+    if (hit) { grab(hit, p); return; }
+    if (tool === 'hold') return;
+    down = { x: p[0], y: p[1], t: performance.now(), moved: 0 };
+    wire = { ax: p[0], ay: p[1], bx: p[0], by: p[1] };
+  });
+
+  cv.addEventListener('pointermove', function (e) {
+    var p = local(e);
+    wake();
+    if (!held && !down) cv.style.cursor = pieceAt(p[0], p[1]) ? 'grab' : (tool === 'hold' ? 'default' : 'crosshair');
+    if (held) {
+      var now = performance.now();
+      var dt = Math.max(16, now - held.t) / 1000;
+      var nx = p[0] + held.ox, ny = p[1] + held.oy;
+      held.vx = (nx - held.pc.pos[0]) / dt;
+      held.vy = (ny - held.pc.pos[1]) / dt;
+      held.pc.pos[0] = nx; held.pc.pos[1] = ny;
+      held.t = now;
+      return;
+    }
+    if (!down) return;
+    down.moved = Math.hypot(p[0] - down.x, p[1] - down.y);
+    wire.bx = p[0]; wire.by = p[1];
+  });
+
+  function endPointer(e) {
+    body.classList.remove('grabbing');
+    if (held) {
+      held.pc.held = false;
+      held.pc.vel[0] = Math.max(-320, Math.min(320, held.vx * 0.45));
+      held.pc.vel[1] = Math.max(-320, Math.min(320, held.vy * 0.45));
+      held = null;
+      return;
+    }
+    if (!down) return;
+    var p = local(e);
+    if (down.moved >= 7) {
+      var secs = Math.max(0.05, (performance.now() - down.t) / 1000);
+      slice(down.x, down.y, p[0], p[1], down.moved / secs);
+    } else {
+      shove(p[0], p[1]);
+    }
+    down = null; wire = null;
+  }
+  cv.addEventListener('pointerup', endPointer);
+  cv.addEventListener('pointercancel', function () {
+    body.classList.remove('grabbing');
+    if (held) { held.pc.held = false; held = null; }
+    down = null; wire = null;
+  });
+
+  window.addEventListener('resize', resize);
+  window.addEventListener('pointermove', wake);
+  if (window.matchMedia) {
+    var mq = window.matchMedia('(prefers-color-scheme: dark)');
+    if (mq.addEventListener) mq.addEventListener('change', applyPalette);
+  }
+
+  buildSwatches();
+  applyPalette();
+  sheet.setAttribute('aria-hidden', 'true');
+  resize();
+  reset();
+  wake();
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
