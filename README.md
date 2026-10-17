@@ -59,6 +59,7 @@ site/               Everything that is published, and nothing else
   og.png            1200x630 link preview image
   fonts/            Self-hosted Archivo and DM Mono (woff2) with their licences
 netlify.toml        Hosting config: publish folder, security and cache headers
+LICENSE             MIT licence for the code
 README.md           This file
 ```
 
@@ -100,5 +101,6 @@ The domain is registered with Namecheap, with its DNS pointing at Netlify.
 
 ## Licence
 
-No licence has been chosen for the code yet, so all rights are reserved by default. The
-fonts keep their own Open Font License.
+The code is released under the [MIT Licence](LICENSE), so you are free to use, change and
+share it as long as the copyright notice comes along. The fonts keep their own SIL Open
+Font License, which is included in `site/fonts/`.
