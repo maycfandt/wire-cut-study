@@ -79,7 +79,6 @@ that way.
 ## Deploying
 
 Hosted on [Netlify](https://www.netlify.com), deploying from the `main` branch on GitHub.
-The domain is registered with Namecheap, with its DNS pointing at Netlify.
 
 - **Every push to `main` goes live** within a minute or so.
 - Pull requests get their own preview link from Netlify, so changes can be checked before
