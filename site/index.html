@@ -1,4 +1,11 @@
 <!doctype html>
+<!--
+  Wire Cut Study, made by maycfandt.
+  https://github.com/maycfandt
+  Source: https://github.com/maycfandt/wire-cut-study
+
+  Cut everything away and see what is left.
+-->
 <html lang="en-GB">
 <head>
 <meta charset="utf-8">
@@ -236,6 +243,20 @@
   .acts { display: flex; gap: 18px; align-items: center; }
 
   button:focus-visible { outline: 2px solid var(--wire); outline-offset: 3px; }
+
+  /* Only appears once every piece has drifted off: what is left when the square is gone. */
+  .maker {
+    position: fixed; left: 50%; top: 50%; z-index: 1;
+    transform: translate(-50%, -50%);
+    font-family: var(--ui); font-weight: 500; font-size: 9.5px; letter-spacing: 0.26em; text-transform: uppercase;
+    color: var(--hud-dim); text-decoration: none; white-space: nowrap; padding: 8px 4px;
+    opacity: 0; visibility: hidden;
+    transition: opacity .4s var(--ease), visibility 0s linear .4s;
+  }
+  body.empty .maker { opacity: 1; visibility: visible; transition: opacity 2.4s var(--ease) .8s, visibility 0s; }
+  .maker:hover { color: var(--wire); }
+  .maker:focus-visible { color: var(--wire); outline: 2px solid var(--wire); outline-offset: 6px; }
+  @media (prefers-reduced-motion: reduce) { .maker, body.empty .maker { transition: none; } }
 </style>
 
 </head>
@@ -248,6 +269,8 @@
 </div>
 
 <div class="hint chrome" id="hint">Cut from bare ground, drag a piece to move it</div>
+
+<a class="maker" href="https://github.com/maycfandt" target="_blank" rel="noopener">made by maycfandt</a>
 
 <div class="scrim" id="scrim"></div>
 
@@ -645,7 +668,11 @@
       if (pc.pos[0] < -m || pc.pos[0] > W + m || pc.pos[1] < -m || pc.pos[1] > H + m) { gone++; continue; }
       out.push(pc);
     }
-    if (out.length !== pieces.length) { pieces = out; updateTally(); }
+    if (out.length !== pieces.length) {
+      pieces = out;
+      updateTally();
+      if (!pieces.length) body.classList.add('empty');
+    }
   }
 
   var wire = null;
@@ -702,6 +729,7 @@
     var x = (W - s) / 2, y = (H - s) / 2;
     pieces = [makePiece([[x, y], [x + s, y], [x + s, y + s], [x, y + s]], [0, 0], 0)];
     cuts = 0; gone = 0;
+    body.classList.remove('empty');
     hint.style.opacity = '1';
     updateTally();
   }
@@ -857,6 +885,9 @@
     var mq = window.matchMedia('(prefers-color-scheme: dark)');
     if (mq.addEventListener) mq.addEventListener('change', applyPalette);
   }
+
+  // For anyone curious enough to open the console.
+  if (window.console) console.log('%cWire Cut Study%c made by maycfandt, https://github.com/maycfandt', 'font-weight:600', '');
 
   buildSwatches();
   applyPalette();
