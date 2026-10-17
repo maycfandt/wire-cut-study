@@ -106,10 +106,6 @@ accident.
 - **Anything visitors need goes in `site/`.** Everything else stays outside it, so it is
   never published.
 - **Plain ES5-style JavaScript.** No modules, no transpiling, no build step.
-- **British English** in all on-screen text, and no em dashes in copy or comments.
-- **Comments explain why, not what**, and are kept sparse.
-- **If the look changes, retake `og.png`** as a 1200x630 screenshot of the toy itself in
-  dark mode after a few cuts, rather than designing a separate image.
 
 ## Running it locally
 
@@ -134,10 +130,11 @@ Hosted on [Netlify](https://www.netlify.com), deploying from the `main` branch o
 
 ## Ideas for later
 
-1. A way to keep an image: export the current plate as a PNG.
-2. Reproducible random palettes, so a colour pair you like can be recovered.
-3. A freehand cutting mode alongside the straight wire.
-4. Real collisions between pieces. This would change the character of the piece
+1. A way to change the shape of the plate.
+2. A way to keep an image: export the current plate as a PNG.
+3. Reproducible random palettes, so a colour pair you like can be recovered.
+4. A freehand cutting mode alongside the straight wire.
+5. Real collisions between pieces. This would change the character of the piece
    considerably, so it would be a redesign rather than a fix.
 
 ## Credits
