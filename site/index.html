@@ -250,10 +250,11 @@
     transform: translate(-50%, -50%);
     font-family: var(--ui); font-weight: 500; font-size: 9.5px; letter-spacing: 0.26em; text-transform: uppercase;
     color: var(--hud-dim); text-decoration: none; white-space: nowrap; padding: 8px 4px;
-    opacity: 0; visibility: hidden;
+    opacity: 0; visibility: hidden; pointer-events: none;
     transition: opacity .4s var(--ease), visibility 0s linear .4s;
   }
-  body.empty .maker { opacity: 1; visibility: visible; transition: opacity 2.4s var(--ease) .8s, visibility 0s; }
+  /* Clickable only while shown, so a fresh plate never sends a press to GitHub mid-fade. */
+  body.empty .maker { opacity: 1; visibility: visible; pointer-events: auto; transition: opacity 2.4s var(--ease) .8s, visibility 0s; }
   .maker:hover { color: var(--wire); }
   .maker:focus-visible { color: var(--wire); outline: 2px solid var(--wire); outline-offset: 6px; }
   @media (prefers-reduced-motion: reduce) { .maker, body.empty .maker { transition: none; } }
