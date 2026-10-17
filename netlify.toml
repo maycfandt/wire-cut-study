@@ -1,0 +1,21 @@
+# Only site/ is published, so README and repo plumbing stay off the public site.
+[build]
+  publish = "site"
+
+# The page loads nothing from any other site. The policy holds it to that, so a
+# stray CDN link or analytics snippet fails loudly instead of quietly leaking visitors.
+# 'unsafe-inline' is needed because the script and styles live inside index.html.
+[[headers]]
+  for = "/*"
+  [headers.values]
+    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+    X-Content-Type-Options = "nosniff"
+    X-Frame-Options = "DENY"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "camera=(), microphone=(), geolocation=(), browsing-topics=()"
+
+# Font files never change under the same name, so browsers can keep them for a year.
+[[headers]]
+  for = "/fonts/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
