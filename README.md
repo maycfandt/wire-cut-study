@@ -65,6 +65,52 @@ README.md           This file
 
 No build step, no package manager, no framework, no dependencies.
 
+## How it works
+
+Notes for anyone changing the code, including the decisions that are easy to undo by
+accident.
+
+- **Pieces.** Each piece is a polygon stored around its own centre, with a position,
+  angle, velocity and spin, drawn to one full-screen canvas. Pieces deliberately pass
+  through each other. There is no collision detection, which keeps the motion calm.
+- **Cutting.** A stroke on bare ground draws the wire, and on release `slice()` makes
+  exactly one straight cut from press point to release point. A piece is only cut if the
+  stroke genuinely touched it: the line crosses one of its edges, or an end of the stroke
+  sits inside it (`strokeTouches`).
+- **Do not pad the stroke.** The stroke is extended by 2px and no more. An earlier version
+  padded strokes by 30% plus 10px to make short cuts easier, and it cut neighbouring
+  pieces the user never touched. Keep the 2px.
+- **Dragging.** Pressing on a piece picks it up, whichever tool is active. The wire only
+  starts on bare ground. Hold is the safety tool: dragging still works, but bare ground
+  does nothing.
+- **Gather depends on "home".** Every piece remembers where it sat in the uncut square
+  (`home` and `homeAng`). When a piece is cut, each half works out its own home from its
+  parent's. Gather eases every piece back home, so the square reassembles with the cuts
+  showing as hairlines. **Any change to the cutting logic must keep homes correct**, or
+  Gather quietly stops lining up.
+- **Motion.** Drift, Fall and Still are three exclusive states. Pieces settle back to
+  their own slow drift rather than stopping, so the plate is never completely still.
+- **Colour.** Everything is drawn from three CSS variables: `--ground`, `--form` and
+  `--wire`. `applyPalette()` sets them, then picks light or dark overlay colours from the
+  ground's brightness so the controls stay readable on any palette. To add a palette, add
+  an entry to the `palettes` array. Nothing else needs touching.
+- **Controls.** One pill at the foot opens the options sheet. All on-screen controls fade
+  to 16% after 2.6 seconds without input and return on any input.
+
+## Working on it
+
+- **Keep it self-contained.** No CDNs, hosted fonts or analytics. The Content Security
+  Policy blocks anything loaded from another site, so it fails loudly in production. If
+  the inline script ever moves to its own file, remove `'unsafe-inline'` from
+  `script-src` in `netlify.toml`.
+- **Anything visitors need goes in `site/`.** Everything else stays outside it, so it is
+  never published.
+- **Plain ES5-style JavaScript.** No modules, no transpiling, no build step.
+- **British English** in all on-screen text, and no em dashes in copy or comments.
+- **Comments explain why, not what**, and are kept sparse.
+- **If the look changes, retake `og.png`** as a 1200x630 screenshot of the toy itself in
+  dark mode after a few cuts, rather than designing a separate image.
+
 ## Running it locally
 
 Serve the `site` folder with any static server, for example:
@@ -91,6 +137,8 @@ Hosted on [Netlify](https://www.netlify.com), deploying from the `main` branch o
 1. A way to keep an image: export the current plate as a PNG.
 2. Reproducible random palettes, so a colour pair you like can be recovered.
 3. A freehand cutting mode alongside the straight wire.
+4. Real collisions between pieces. This would change the character of the piece
+   considerably, so it would be a redesign rather than a fix.
 
 ## Credits
 
