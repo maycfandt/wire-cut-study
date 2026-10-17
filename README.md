@@ -7,7 +7,8 @@ slowly drift away.
 
 Open `index.html` in a browser. That is the whole thing.
 
-For local work with correct font loading, serve it rather than opening the file directly:
+Fonts are served from `fonts/`, so for local work serve the folder rather than opening the
+file directly:
 
     python3 -m http.server 8000
 
@@ -30,4 +31,5 @@ Then visit http://localhost:8000
 
 ## Deploying
 
-Static hosting, single file.
+Live at https://cheesewireisyourfriend.com, served by Netlify from `main`. Static
+hosting, one page plus `fonts/` and `og.png`.
